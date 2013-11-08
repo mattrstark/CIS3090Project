@@ -29,6 +29,8 @@ def imgResize(imageName):
     im4.save(saveDir + "BICUBIC" + ext)
     im5.save(saveDir + "ANTIALIAS" + ext)
 
+    print "Worker is done"
+
 
 if __name__ == '__main__':
     #pool = Pool(processes=2)
@@ -40,6 +42,7 @@ if __name__ == '__main__':
     worker = multiprocessing.Process(target=imgResize, args=(imageName,)) # use default name
     worker.start()
     #print pool.map(imgResize, im1)
+    worker.join()
     print "Done in %.2f seconds" % time.clock()
 
 
