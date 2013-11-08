@@ -1,4 +1,4 @@
-import Image
+from PIL import Image
 
 global assetDir
 global saveDir
