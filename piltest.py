@@ -24,7 +24,7 @@ def imgResize(im):
     im5.save(saveDir + "ANTIALIAS" + ext)
 
 imageFile = assetDir + "test.jpg"
-im1 = Image.open(imageFile)
+im1 = Image.open(imageFile).convert("RGB")
 
 imgResize(im1)
 
