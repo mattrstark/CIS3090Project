@@ -3,8 +3,8 @@ import time
 import sys
 import multiprocessing as mp
 import logging
-logger = mp.log_to_stderr()
-logger.setLevel(mp.SUBDEBUG)
+#logger = mp.log_to_stderr()
+#logger.setLevel(mp.SUBDEBUG)
 
 
 global assetDir
@@ -14,28 +14,35 @@ assetDir = "assets/"
 saveDir = "results/"
 ext = ".jpg"
 
-def imgResize(threadID, imageName):
+def imgResize(threadID, imageName, algoToRun, workload):
     print "~~~~~~~~~Worker #" + str(threadID) + " is starting~~~~~~~~~"
-    im1 = Image.open(imageName).convert("RGB")
-    div = 2
-    width = im1.size[0] / div
-    height = im1.size[1] / div
-
-    im2 = im1.resize((width, height), Image.NEAREST) # use nearest neighbour
-    im3 = im1.resize((width, height), Image.BILINEAR) # linear interpolation in a 2x2 environment
-    im4 = im1.resize((width, height), Image.BICUBIC) # cubic spline interpolation in a 4x4 environment
-    im5 = im1.resize((width, height), Image.ANTIALIAS) # best down-sizing filter
+    image = Image.open(imageName).convert("RGB")
+    if algoToRun == 0:
+        newData = colourToGrey(image, workload, threadID)
+    elif algoToRun == 1:
+        print "n is a perfect square\n"
+    elif algoToRun == 2:
+        print "n is an even number\n"
+    elif algoToRun == 3:
+        print "n is a prime number\n"
     
-    im2.save(saveDir + "NEAREST" + str(threadID) + ext)
-    im3.save(saveDir + "BILINEAR" + str(threadID) + ext)
-    im4.save(saveDir + "BICUBIC" + str(threadID) + ext)
-    im5.save(saveDir + "ANTIALIAS" + str(threadID) + ext)
-
-    return threadID
+    returnValue = {'threadID' : threadID, 'newData' : newData, 'pixelAmount' : workload}
+    print "returned",threadID,workload
+    return returnValue
 
 
-def log_result(threadID):
+def log_result(returnedValue):
+    global modifiedImage
+    threadID = returnedValue['threadID']
+    returnedData = returnedValue['newData']
+    pixelNum = returnedValue['pixelAmount']
     print "~~~~~~~~Worker #" + str(threadID) + " is done~~~~~~~"
+    offsetX = (pixelNum * threadID) % width
+    offsetY = (pixelNum * threadID) // width
+    for i in range(0, pixelNum):
+        offX = (offsetX + i) % width
+        offY = offsetY + ((offsetX + i) // width)
+        modifiedImage[offX,offY] = returnedData[offX][offY]
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
@@ -51,11 +58,23 @@ if __name__ == '__main__':
     time.clock
     
     imageName = assetDir + sys.argv[1]
-
+    
+    image = Image.open(imageName).convert("RGB")
+    width, height = image.size
+    area = width * height
+    pixelAmount = area // procNum
+    extraPixels = area % procNum
+    algorithmToDo = 0
+    newImage = Image.new('RGB', image.size, (0,255,255))
+    modifiedImage = newImage.load()
+    
     pool = mp.Pool(procNum)
     for i in range(procNum):
+        finalPixelAmount = pixelAmount
+        if(i == procNum -1):
+            finalPixelAmount += extraPixels
         print "~~~~~~~~Worker #" + str(i) + " is being assigned~~~~~~~"
-        pool.apply_async(imgResize, args = (i, imageName, ), callback = log_result)
+        pool.apply_async(imgResize, args = (i, imageName, algorithmToDo, finalPixelAmount ), callback = log_result)
 
     pool.close()
     pool.join()
@@ -65,5 +84,33 @@ if __name__ == '__main__':
     #print pool.map(imgResize, im1)
     #worker.join()
     print "Done in %.2f seconds" % time.clock()
+    newImage.save("out.jpg")
+
+def colourToGrey(image, pixelNum, threadID):
+    width, height = image.size
+    data = image.load()
+    newData = [[0 for x in xrange(height)] for x in xrange(width)]
+    offsetX = (pixelNum * threadID) % width
+    offsetY = (pixelNum * threadID) // width
+   
+    print offsetX, offsetY
+    
+    for i in range(0, pixelNum):
+        offX = (offsetX + i) % width
+        offY = offsetY + ((offsetX + i) // width)
+        # grey conversion from http://stackoverflow.com/a/15686412
+        R_linear = sRGB_to_linear(data[offX,offY][0]/255.0)
+        G_linear = sRGB_to_linear(data[offX,offY][1]/255.0)
+        B_linear = sRGB_to_linear(data[offX,offY][2]/255.0)
+        #print i,"\\",pixelNum," ", "rawData",offX,offY,"=",0.299 * R_linear + 0.587 * G_linear + 0.114 * B_linear
+        #newData[offY][offX] = 0.299 * R_linear + 0.587 * G_linear + 0.114 * B_linear
+        newData[offX][offY] = (125,125,125)
+    print "fin"
+    return newData
 
 
+# Taken from http://stackoverflow.com/a/15686412
+def sRGB_to_linear(x):
+    if (x < 0.04045):
+        return x/12.92
+    return pow(((x+0.055)/1.055),2.4)
