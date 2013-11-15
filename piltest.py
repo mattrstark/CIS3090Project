@@ -98,19 +98,7 @@ def colourToGrey(image, pixelNum, threadID):
     for i in range(0, pixelNum):
         offX = (offsetX + i) % width
         offY = offsetY + ((offsetX + i) // width)
-        # grey conversion from http://stackoverflow.com/a/15686412
-        R_linear = sRGB_to_linear(data[offX,offY][0]/255.0)
-        G_linear = sRGB_to_linear(data[offX,offY][1]/255.0)
-        B_linear = sRGB_to_linear(data[offX,offY][2]/255.0)
-        #print i,"\\",pixelNum," ", "rawData",offX,offY,"=",0.299 * R_linear + 0.587 * G_linear + 0.114 * B_linear
-        #newData[offY][offX] = 0.299 * R_linear + 0.587 * G_linear + 0.114 * B_linear
-        newData[offX][offY] = (125,125,125)
+        # grey conversion by taking just the green value
+        newData[offX][offY] = (data[offX,offY][1],data[offX,offY][1],data[offX,offY][1])
     print "fin"
     return newData
-
-
-# Taken from http://stackoverflow.com/a/15686412
-def sRGB_to_linear(x):
-    if (x < 0.04045):
-        return x/12.92
-    return pow(((x+0.055)/1.055),2.4)
