@@ -14,7 +14,22 @@ assetDir = "assets/"
 saveDir = "results/"
 ext = ".jpg"
 
-def imgResize(threadID, imageName, algoToRun, workload):
+def colourToGrey(image, pixelNum, threadID):
+    width, height = image.size
+    data = image.load()
+    newData = [[0 for x in xrange(height)] for x in xrange(width)]
+    offsetX = (pixelNum * threadID) % width
+    offsetY = (pixelNum * threadID) // width
+   
+    
+    for i in range(0, pixelNum):
+        offX = (offsetX + i) % width
+        offY = offsetY + ((offsetX + i) // width)
+        # grey conversion by taking just the green value
+        newData[offX][offY] = (data[offX,offY][1],data[offX,offY][1],data[offX,offY][1])
+    return newData
+
+def workerProc(threadID, imageName, algoToRun, workload):
     print "~~~~~~~~~Worker #" + str(threadID) + " is starting~~~~~~~~~"
     image = Image.open(imageName).convert("RGB")
     if algoToRun == 0:
@@ -27,7 +42,7 @@ def imgResize(threadID, imageName, algoToRun, workload):
         print "n is a prime number\n"
     
     returnValue = {'threadID' : threadID, 'newData' : newData, 'pixelAmount' : workload}
-    print "returned",threadID,workload
+    #print "returned",threadID,workload
     return returnValue
 
 
@@ -49,7 +64,6 @@ if __name__ == '__main__':
         sys.exit("Not enough arguments provided")
     try:
         procNum = int(sys.argv[2])
-        print procNum
     except ValueError:
         sys.exit("Argument 2: '" + sys.argv[2] + "' (number of processors) is not a valid number")
 
@@ -77,31 +91,10 @@ if __name__ == '__main__':
         if(i == procNum -1):
             finalPixelAmount += extraPixels
         print "~~~~~~~~Worker #" + str(i) + " is being assigned~~~~~~~"
-        pool.apply_async(imgResize, args = (i, imageName, algorithmToDo, finalPixelAmount ), callback = log_result)
+        pool.apply_async(workerProc, args = (i, imageName, algorithmToDo, finalPixelAmount ), callback = log_result)
 
     pool.close()
     pool.join()
     
-    #worker = multiprocessing.Process(target=imgResize, args=(imageName,)) # use default name
-    #worker.start()
-    #print pool.map(imgResize, im1)
-    #worker.join()
-    print "Done in %.2f seconds" % time.clock()
+    print "Done in %.4f seconds" % time.clock()
     newImage.save("out.jpg")
-
-def colourToGrey(image, pixelNum, threadID):
-    width, height = image.size
-    data = image.load()
-    newData = [[0 for x in xrange(height)] for x in xrange(width)]
-    offsetX = (pixelNum * threadID) % width
-    offsetY = (pixelNum * threadID) // width
-   
-    print offsetX, offsetY
-    
-    for i in range(0, pixelNum):
-        offX = (offsetX + i) % width
-        offY = offsetY + ((offsetX + i) // width)
-        # grey conversion by taking just the green value
-        newData[offX][offY] = (data[offX,offY][1],data[offX,offY][1],data[offX,offY][1])
-    print "fin"
-    return newData
