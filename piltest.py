@@ -15,14 +15,46 @@ assetDir = "assets/"
 saveDir = "results/"
 ext = ".jpg"
 
-def blur(image, pixelNum, threadID):
+
+def threshold(image, pixelNum, threadID, procNum):
     width, height = image.size
     data = image.load()
     newData = [[0 for x in xrange(height)] for x in xrange(width)]
     offsetX = (pixelNum * threadID) % width
     offsetY = (pixelNum * threadID) // width
     
-    blurSize = 15;
+    if(threadID == procNum - 1):
+        area = width * height
+        extraPixels = area % procNum
+        pixelNum += extraPixels
+        
+    thresholdValue = 125
+    
+    for i in range(0, pixelNum):
+        offX = (offsetX + i) % width
+        offY = offsetY + ((offsetX + i) // width)
+        # if the green value is greater than the threshold value, make it white
+        if(data[offX,offY][1] > thresholdValue):
+            newData[offX][offY] = (255,255,255)
+        else:
+            newData[offX][offY] = (0,0,0)
+        
+    return newData
+
+def blur(image, pixelNum, threadID, procNum):
+    width, height = image.size
+    data = image.load()
+    newData = [[0 for x in xrange(height)] for x in xrange(width)]
+    offsetX = (pixelNum * threadID) % width
+    offsetY = (pixelNum * threadID) // width
+    
+    if(threadID == procNum - 1):
+        area = width * height
+        extraPixels = area % procNum
+        pixelNum += extraPixels
+    
+    # size of the blur kernel
+    blurSize = 2;
         
     for i in range(0, pixelNum):
         offX = (offsetX + i) % width
@@ -30,12 +62,14 @@ def blur(image, pixelNum, threadID):
         redValues = []
         greenValues = []
         blueValues = []
-        for k in range(0,blurSize):
-            if((offX + k) > 0 and (offX + k) < width):
-                if((offY + k) > 0 and (offY + k) < height):
-                    redValues.append(data[offX+k,offY][0])
-                    greenValues.append(data[offX+k,offY][1])
-                    blueValues.append(data[offX+k,offY][2])
+        #get the average RGB of all the pixels around each pixel
+        for j in range(-blurSize,blurSize):
+            if((offX + j) > 0 and (offX + j) < width):
+                for k in range(-blurSize,blurSize):
+                    if((offY + k) > 0 and (offY + k) < height):
+                        redValues.append(data[offX+j,offY+k][0])
+                        greenValues.append(data[offX+j,offY+k][1])
+                        blueValues.append(data[offX+j,offY+k][2])
         averageRed = sum(redValues) / len(redValues)
         averageGreen = sum(greenValues) / len(greenValues)
         averageBlue = sum(blueValues) / len(blueValues)
@@ -68,9 +102,9 @@ def workerProc(threadID, imageName, algoToRun, workload, procNum):
     if algoToRun == 0:
         newData = colourToGrey(image, workload, threadID, procNum)
     elif algoToRun == 1:
-        newData = blur(image, workload, threadID)
+        newData = blur(image, workload, threadID, procNum)
     elif algoToRun == 2:
-        print "n is an even number\n"
+        newData = threshold(image, workload, threadID, procNum)
     elif algoToRun == 3:
         print "n is a prime number\n"
     
@@ -118,7 +152,7 @@ if __name__ == '__main__':
     area = width * height
     pixelAmount = area // procNum
     extraPixels = area % procNum
-    algorithmToDo = 0
+    algorithmToDo = 2
     newImage = Image.new('RGB', image.size, (0,255,255))
     modifiedImage = newImage.load()
     
