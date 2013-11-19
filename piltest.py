@@ -54,7 +54,7 @@ def medianNoiseRemoval(image, pixelNum, threadID, procNum):
         newData[offX][offY] = (medianRed,medianGreen,medianBlue)
     return newData
 
-def threshold(image, pixelNum, threadID, procNum):
+def threshold(image, pixelNum, threadID, procNum, secondValue):
     width, height = image.size
     data = image.load()
     newData = [[0 for x in xrange(height)] for x in xrange(width)]
@@ -65,8 +65,11 @@ def threshold(image, pixelNum, threadID, procNum):
         area = width * height
         extraPixels = area % procNum
         pixelNum += extraPixels
-        
-    thresholdValue = 125
+    
+    if(secondValue != 0):    
+        thresholdValue = secondValue
+    else:
+        thresholdValue = 125
     
     for i in range(0, pixelNum):
         offX = (offsetX + i) % width
@@ -79,7 +82,7 @@ def threshold(image, pixelNum, threadID, procNum):
         
     return newData
 
-def blur(image, pixelNum, threadID, procNum):
+def blur(image, pixelNum, threadID, procNum, secondValue):
     width, height = image.size
     data = image.load()
     newData = [[0 for x in xrange(height)] for x in xrange(width)]
@@ -92,7 +95,10 @@ def blur(image, pixelNum, threadID, procNum):
         pixelNum += extraPixels
     
     # size of the blur kernel
-    blurSize = 2;
+    if(secondValue != 0):    
+        blurSize = secondValue
+    else:
+        blurSize = 2
         
     for i in range(0, pixelNum):
         offX = (offsetX + i) % width
@@ -133,15 +139,15 @@ def colourToGrey(image, pixelNum, threadID, procNum):
         newData[offX][offY] = (data[offX,offY][1],data[offX,offY][1],data[offX,offY][1])
     return newData
 
-def workerProc(threadID, imageName, algoToRun, workload, procNum):
+def workerProc(threadID, imageName, algoToRun, secondValue, workload, procNum):
     print "~~~~~~~~~Worker #" + str(threadID) + " is starting~~~~~~~~~"
     image = Image.open(imageName).convert("RGB")
     if algoToRun == 0:
         newData = colourToGrey(image, workload, threadID, procNum)
     elif algoToRun == 1:
-        newData = blur(image, workload, threadID, procNum)
+        newData = blur(image, workload, threadID, procNum, secondValue)
     elif algoToRun == 2:
-        newData = threshold(image, workload, threadID, procNum)
+        newData = threshold(image, workload, threadID, procNum, secondValue)
     elif algoToRun == 3:
         newData = medianNoiseRemoval(image, workload, threadID, procNum)
     
@@ -175,10 +181,28 @@ if __name__ == '__main__':
     except ValueError:
         sys.exit("Argument 2: '" + sys.argv[2] + "' (number of processors) is not a valid number")
 
-    if not (99 > procNum > 1):
+    if not (99 > procNum > 0):
         sys.exit("Argument 2: '" + sys.argv[2] + "' (number of processors) is not between a valid range of 1 and 99")    
-    time.clock
-    
+
+    secondaryArgument = 0
+
+    if len(sys.argv) < 4:
+        algorithmToDo = 0
+    else:
+        if(len(sys.argv) == 5):
+            try:
+                algorithmToDo = int(sys.argv[3])
+                secondaryArgument = int(sys.argv[4])
+            except ValueError:
+                sys.exit("Argument 3: '" + sys.argv[3] + "' (algorithmToDo) or Argument 4: '" + sys.argv[4] + "'is not a valid number")
+        else:
+            try:
+                algorithmToDo = int(sys.argv[3])
+            except ValueError:
+                sys.exit("Argument 3: '" + sys.argv[3] + "' (algorithmToDo) is not a valid number")
+
+    #print algorithmToDo, secondaryArgument
+    startTime = time.time()
     imageName = assetDir + sys.argv[1]
     
     try:
@@ -189,7 +213,6 @@ if __name__ == '__main__':
     area = width * height
     pixelAmount = area // procNum
     extraPixels = area % procNum
-    algorithmToDo = 3
     newImage = Image.new('RGB', image.size, (0,255,255))
     modifiedImage = newImage.load()
     
@@ -199,10 +222,10 @@ if __name__ == '__main__':
         #if(i == procNum -1):
         #    finalPixelAmount += extraPixels
         print "~~~~~~~~Worker #" + str(i) + " is being assigned~~~~~~~"
-        pool.apply_async(workerProc, args = (i, imageName, algorithmToDo, finalPixelAmount, procNum ), callback = log_result)
+        pool.apply_async(workerProc, args = (i, imageName, algorithmToDo, secondaryArgument, finalPixelAmount, procNum ), callback = log_result)
 
     pool.close()
     pool.join()
-    
-    print "Done in %.4f seconds" % time.clock()
-    newImage.save("out.jpg")
+    elapsedTime = (time.time() - startTime)
+    print "Done in %.4f seconds" % elapsedTime
+    newImage.save(saveDir + "out.jpg")
