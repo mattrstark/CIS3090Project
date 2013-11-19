@@ -10,17 +10,50 @@ import logging
 global assetDir
 global saveDir
 global ext
+global procNum
 assetDir = "assets/"
 saveDir = "results/"
 ext = ".jpg"
 
-def colourToGrey(image, pixelNum, threadID):
+def blur(image, pixelNum, threadID):
     width, height = image.size
     data = image.load()
     newData = [[0 for x in xrange(height)] for x in xrange(width)]
     offsetX = (pixelNum * threadID) % width
     offsetY = (pixelNum * threadID) // width
-   
+    
+    blurSize = 15;
+        
+    for i in range(0, pixelNum):
+        offX = (offsetX + i) % width
+        offY = offsetY + ((offsetX + i) // width)
+        redValues = []
+        greenValues = []
+        blueValues = []
+        for k in range(0,blurSize):
+            if((offX + k) > 0 and (offX + k) < width):
+                if((offY + k) > 0 and (offY + k) < height):
+                    redValues.append(data[offX+k,offY][0])
+                    greenValues.append(data[offX+k,offY][1])
+                    blueValues.append(data[offX+k,offY][2])
+        averageRed = sum(redValues) / len(redValues)
+        averageGreen = sum(greenValues) / len(greenValues)
+        averageBlue = sum(blueValues) / len(blueValues)
+        # grey conversion by taking just the green value
+        newData[offX][offY] = (averageRed,averageGreen,averageBlue)
+    return newData
+
+def colourToGrey(image, pixelNum, threadID, procNum):
+    width, height = image.size
+    data = image.load()
+    newData = [[0 for x in xrange(height)] for x in xrange(width)]
+    offsetX = (pixelNum * threadID) % width
+    offsetY = (pixelNum * threadID) // width
+    
+    if(threadID == procNum - 1):
+        area = width * height
+        extraPixels = area % procNum
+        pixelNum += extraPixels
     
     for i in range(0, pixelNum):
         offX = (offsetX + i) % width
@@ -29,13 +62,13 @@ def colourToGrey(image, pixelNum, threadID):
         newData[offX][offY] = (data[offX,offY][1],data[offX,offY][1],data[offX,offY][1])
     return newData
 
-def workerProc(threadID, imageName, algoToRun, workload):
+def workerProc(threadID, imageName, algoToRun, workload, procNum):
     print "~~~~~~~~~Worker #" + str(threadID) + " is starting~~~~~~~~~"
     image = Image.open(imageName).convert("RGB")
     if algoToRun == 0:
-        newData = colourToGrey(image, workload, threadID)
+        newData = colourToGrey(image, workload, threadID, procNum)
     elif algoToRun == 1:
-        print "n is a perfect square\n"
+        newData = blur(image, workload, threadID)
     elif algoToRun == 2:
         print "n is an even number\n"
     elif algoToRun == 3:
@@ -54,6 +87,10 @@ def log_result(returnedValue):
     print "~~~~~~~~Worker #" + str(threadID) + " is done~~~~~~~"
     offsetX = (pixelNum * threadID) % width
     offsetY = (pixelNum * threadID) // width
+    if(threadID == procNum - 1):
+        area = width * height
+        extraPixels = area % procNum
+        pixelNum += extraPixels
     for i in range(0, pixelNum):
         offX = (offsetX + i) % width
         offY = offsetY + ((offsetX + i) // width)
@@ -88,10 +125,10 @@ if __name__ == '__main__':
     pool = mp.Pool(procNum)
     for i in range(procNum):
         finalPixelAmount = pixelAmount
-        if(i == procNum -1):
-            finalPixelAmount += extraPixels
+        #if(i == procNum -1):
+        #    finalPixelAmount += extraPixels
         print "~~~~~~~~Worker #" + str(i) + " is being assigned~~~~~~~"
-        pool.apply_async(workerProc, args = (i, imageName, algorithmToDo, finalPixelAmount ), callback = log_result)
+        pool.apply_async(workerProc, args = (i, imageName, algorithmToDo, finalPixelAmount, procNum ), callback = log_result)
 
     pool.close()
     pool.join()
