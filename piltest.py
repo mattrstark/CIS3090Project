@@ -59,7 +59,10 @@ if __name__ == '__main__':
     
     imageName = assetDir + sys.argv[1]
     
-    image = Image.open(imageName).convert("RGB")
+    try:
+        image = Image.open(imageName).convert("RGB")
+    except IOError:
+        sys.exit("Failed to open image: " + imageName);
     width, height = image.size
     area = width * height
     pixelAmount = area // procNum
