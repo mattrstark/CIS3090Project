@@ -15,6 +15,44 @@ assetDir = "assets/"
 saveDir = "results/"
 ext = ".jpg"
 
+# median function modified from http://stackoverflow.com/a/10482734
+def median(mylist):
+    sorts = sorted(mylist)
+    length = len(sorts)
+    if not length % 2:
+        return (sorts[length / 2] + sorts[length / 2 - 1]) / 2
+    return sorts[length / 2]
+
+def medianNoiseRemoval(image, pixelNum, threadID, procNum):
+    width, height = image.size
+    data = image.load()
+    newData = [[0 for x in xrange(height)] for x in xrange(width)]
+    offsetX = (pixelNum * threadID) % width
+    offsetY = (pixelNum * threadID) // width
+    
+    if(threadID == procNum - 1):
+        area = width * height
+        extraPixels = area % procNum
+        pixelNum += extraPixels
+    for i in range(0, pixelNum):
+        offX = (offsetX + i) % width
+        offY = offsetY + ((offsetX + i) // width)
+        redValues = []
+        greenValues = []
+        blueValues = []
+        #get the median RGB of neighbouring pixels
+        for j in range(-1,2):
+            if((offX + j) > 0 and (offX + j) < width):
+                for k in range(-1,2):
+                    if((offY + k) > 0 and (offY + k) < height):
+                        redValues.append(data[offX+j,offY+k][0])
+                        greenValues.append(data[offX+j,offY+k][1])
+                        blueValues.append(data[offX+j,offY+k][2])
+        medianRed = median(redValues)
+        medianGreen = median(greenValues)
+        medianBlue = median(blueValues)
+        newData[offX][offY] = (medianRed,medianGreen,medianBlue)
+    return newData
 
 def threshold(image, pixelNum, threadID, procNum):
     width, height = image.size
@@ -63,9 +101,9 @@ def blur(image, pixelNum, threadID, procNum):
         greenValues = []
         blueValues = []
         #get the average RGB of all the pixels around each pixel
-        for j in range(-blurSize,blurSize):
+        for j in range(-blurSize,blurSize+1):
             if((offX + j) > 0 and (offX + j) < width):
-                for k in range(-blurSize,blurSize):
+                for k in range(-blurSize,blurSize+1):
                     if((offY + k) > 0 and (offY + k) < height):
                         redValues.append(data[offX+j,offY+k][0])
                         greenValues.append(data[offX+j,offY+k][1])
@@ -73,7 +111,6 @@ def blur(image, pixelNum, threadID, procNum):
         averageRed = sum(redValues) / len(redValues)
         averageGreen = sum(greenValues) / len(greenValues)
         averageBlue = sum(blueValues) / len(blueValues)
-        # grey conversion by taking just the green value
         newData[offX][offY] = (averageRed,averageGreen,averageBlue)
     return newData
 
@@ -106,7 +143,7 @@ def workerProc(threadID, imageName, algoToRun, workload, procNum):
     elif algoToRun == 2:
         newData = threshold(image, workload, threadID, procNum)
     elif algoToRun == 3:
-        print "n is a prime number\n"
+        newData = medianNoiseRemoval(image, workload, threadID, procNum)
     
     returnValue = {'threadID' : threadID, 'newData' : newData, 'pixelAmount' : workload}
     #print "returned",threadID,workload
@@ -152,7 +189,7 @@ if __name__ == '__main__':
     area = width * height
     pixelAmount = area // procNum
     extraPixels = area % procNum
-    algorithmToDo = 2
+    algorithmToDo = 3
     newImage = Image.new('RGB', image.size, (0,255,255))
     modifiedImage = newImage.load()
     
