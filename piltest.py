@@ -6,14 +6,73 @@ import logging
 #logger = mp.log_to_stderr()
 #logger.setLevel(mp.SUBDEBUG)
 
-
 global assetDir
 global saveDir
-global ext
-global procNum
 assetDir = "assets/"
 saveDir = "results/"
-ext = ".jpg"
+
+argumentExample = "Expected args: <image_name> <CPUs to use> <algorithm> (arg)\n\
+Example args: test.jpg 4 1 2"
+
+def erosion(image, pixelNum, threadID, procNum):
+    width, height = image.size
+    data = image.load()
+    newData = [[0 for x in xrange(height)] for x in xrange(width)]
+    offsetX = (pixelNum * threadID) % width
+    offsetY = (pixelNum * threadID) // width
+    
+    if(threadID == procNum - 1):
+        area = width * height
+        extraPixels = area % procNum
+        pixelNum += extraPixels
+    for i in range(0, pixelNum):
+        offX = (offsetX + i) % width
+        offY = offsetY + ((offsetX + i) // width)
+        # using lowest green since it's a good measurement of value
+        lowestRed = 255
+        lowestGreen = 255
+        lowestBlue = 255
+        # get the lowest value of neighbouring pixels
+        for j in range(-1,2):
+            if((offX + j) > 0 and (offX + j) < width):
+                for k in range(-1,2):
+                    if((offY + k) > 0 and (offY + k) < height): 
+                        if(data[offX+j,offY+k][1] < lowestGreen): 
+                            lowestRed = data[offX+j,offY+k][0]
+                            lowestGreen = data[offX+j,offY+k][1]
+                            lowestBlue = data[offX+j,offY+k][2]
+        newData[offX][offY] = (lowestRed,lowestGreen,lowestBlue)
+    return newData
+
+def dilation(image, pixelNum, threadID, procNum):
+    width, height = image.size
+    data = image.load()
+    newData = [[0 for x in xrange(height)] for x in xrange(width)]
+    offsetX = (pixelNum * threadID) % width
+    offsetY = (pixelNum * threadID) // width
+    
+    if(threadID == procNum - 1):
+        area = width * height
+        extraPixels = area % procNum
+        pixelNum += extraPixels
+    for i in range(0, pixelNum):
+        offX = (offsetX + i) % width
+        offY = offsetY + ((offsetX + i) // width)
+        # using highest green since it's a good measurement of value
+        highestRed = 0
+        highestGreen = 0
+        highestBlue = 0
+        # get the highest value of neighbouring pixels
+        for j in range(-1,2):
+            if((offX + j) > 0 and (offX + j) < width):
+                for k in range(-1,2):
+                    if((offY + k) > 0 and (offY + k) < height): 
+                        if(data[offX+j,offY+k][1] > highestGreen): 
+                            highestRed = data[offX+j,offY+k][0]
+                            highestGreen = data[offX+j,offY+k][1]
+                            highestBlue = data[offX+j,offY+k][2]
+        newData[offX][offY] = (highestRed,highestGreen,highestBlue)
+    return newData
 
 # median function modified from http://stackoverflow.com/a/10482734
 def median(mylist):
@@ -150,6 +209,12 @@ def workerProc(threadID, imageName, algoToRun, secondValue, workload, procNum):
         newData = threshold(image, workload, threadID, procNum, secondValue)
     elif algoToRun == 3:
         newData = medianNoiseRemoval(image, workload, threadID, procNum)
+    elif algoToRun == 4:    
+        newData = dilation(image, workload, threadID, procNum)
+    elif algoToRun == 5:    
+        newData = erosion(image, workload, threadID, procNum)
+    else:
+        print "Unrecognized algorithm argument"
     
     returnValue = {'threadID' : threadID, 'newData' : newData, 'pixelAmount' : workload}
     #print "returned",threadID,workload
@@ -175,13 +240,16 @@ def log_result(returnedValue):
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
+        print argumentExample
         sys.exit("Not enough arguments provided")
     try:
         procNum = int(sys.argv[2])
     except ValueError:
+        print argumentExample
         sys.exit("Argument 2: '" + sys.argv[2] + "' (number of processors) is not a valid number")
 
     if not (99 > procNum > 0):
+        print argumentExample
         sys.exit("Argument 2: '" + sys.argv[2] + "' (number of processors) is not between a valid range of 1 and 99")    
 
     secondaryArgument = 0
