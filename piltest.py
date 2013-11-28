@@ -51,6 +51,7 @@ def dilation(image, pixelNum, threadID, procNum):
     offsetX = (pixelNum * threadID) % width
     offsetY = (pixelNum * threadID) // width
     
+    # get any extra pixels if this processor is the last processor
     if(threadID == procNum - 1):
         area = width * height
         extraPixels = area % procNum
@@ -89,6 +90,7 @@ def medianNoiseRemoval(image, pixelNum, threadID, procNum):
     offsetX = (pixelNum * threadID) % width
     offsetY = (pixelNum * threadID) // width
     
+    # get any extra pixels if this processor is the last processor
     if(threadID == procNum - 1):
         area = width * height
         extraPixels = area % procNum
@@ -120,6 +122,7 @@ def threshold(image, pixelNum, threadID, procNum, secondValue):
     offsetX = (pixelNum * threadID) % width
     offsetY = (pixelNum * threadID) // width
     
+    # get any extra pixels if this processor is the last processor
     if(threadID == procNum - 1):
         area = width * height
         extraPixels = area % procNum
@@ -148,6 +151,7 @@ def blur(image, pixelNum, threadID, procNum, secondValue):
     offsetX = (pixelNum * threadID) % width
     offsetY = (pixelNum * threadID) // width
     
+    # get any extra pixels if this processor is the last processor
     if(threadID == procNum - 1):
         area = width * height
         extraPixels = area % procNum
@@ -186,6 +190,7 @@ def colourToGrey(image, pixelNum, threadID, procNum):
     offsetX = (pixelNum * threadID) % width
     offsetY = (pixelNum * threadID) // width
     
+    # get any extra pixels if this processor is the last processor
     if(threadID == procNum - 1):
         area = width * height
         extraPixels = area % procNum
@@ -201,6 +206,7 @@ def colourToGrey(image, pixelNum, threadID, procNum):
 def workerProc(threadID, imageName, algoToRun, secondValue, workload, procNum):
     print "~~~~~~~~~Worker #" + str(threadID) + " is starting~~~~~~~~~"
     image = Image.open(imageName).convert("RGB")
+    # determine which algorithm to run
     if algoToRun == 0:
         newData = colourToGrey(image, workload, threadID, procNum)
     elif algoToRun == 1:
@@ -220,7 +226,7 @@ def workerProc(threadID, imageName, algoToRun, secondValue, workload, procNum):
     #print "returned",threadID,workload
     return returnValue
 
-
+# combine the modified image chunks into one final image
 def log_result(returnedValue):
     global modifiedImage
     threadID = returnedValue['threadID']
@@ -269,31 +275,31 @@ if __name__ == '__main__':
             except ValueError:
                 sys.exit("Argument 3: '" + sys.argv[3] + "' (algorithmToDo) is not a valid number")
 
-    #print algorithmToDo, secondaryArgument
     startTime = time.time()
     imageName = assetDir + sys.argv[1]
     
     try:
+        # open the image and convert it to a RGB format
         image = Image.open(imageName).convert("RGB")
     except IOError:
         sys.exit("Failed to open image: " + imageName);
     width, height = image.size
     area = width * height
+    # calculate the pixel amount each section will get
     pixelAmount = area // procNum
-    extraPixels = area % procNum
     newImage = Image.new('RGB', image.size, (0,255,255))
     modifiedImage = newImage.load()
     
+    # assign a pixel amount to each process
     pool = mp.Pool(procNum)
     for i in range(procNum):
         finalPixelAmount = pixelAmount
-        #if(i == procNum -1):
-        #    finalPixelAmount += extraPixels
         print "~~~~~~~~Worker #" + str(i) + " is being assigned~~~~~~~"
         pool.apply_async(workerProc, args = (i, imageName, algorithmToDo, secondaryArgument, finalPixelAmount, procNum ), callback = log_result)
 
     pool.close()
     pool.join()
+    
     elapsedTime = (time.time() - startTime)
     print "Done in %.4f seconds" % elapsedTime
     newImage.save(saveDir + "out.jpg")
